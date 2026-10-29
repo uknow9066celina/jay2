@@ -1,0 +1,439 @@
+<title>알록달록 색칠놀이</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<style>
+/* Layout: one-screen app. Home = scrolling picture grid; Paint = top bar + square board + big crayon palette (side in landscape, bottom in portrait) */
+:root{
+  --bg:#f1edff; --card:#ffffff; --ink:#3b2f4a; --line:#3b2f4a;
+  --pink:#ff5fa2; --sun:#ffd23f; --sky:#7cc6ff; --soft:#e3dcfb;
+  --font:"Jua","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;overflow:hidden}
+#app{height:100%}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-action:manipulation}
+button:focus-visible{outline:4px solid var(--sky);outline-offset:3px}
+
+/* ---------- Home ---------- */
+#home{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.hero{max-width:1100px;margin:0 auto 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.logo{width:72px;height:72px;flex:none}
+.hero h1{margin:0;font-size:clamp(30px,5vw,46px);font-weight:400;letter-spacing:.5px;line-height:1.1}
+.hero h1 .a{color:var(--pink)} .hero h1 .b{color:#f0a400} .hero h1 .c{color:#3aa3e8} .hero h1 .d{color:#7a5ae0}
+.hero p{margin:4px 0 0;font-size:19px;opacity:.75}
+.grid{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}
+.card{background:var(--card);border-radius:26px;padding:10px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;box-shadow:0 4px 0 var(--soft);transition:transform .15s}
+.card:active{transform:scale(.95)}
+.card .thumb{width:100%;aspect-ratio:1;max-width:100%;border-radius:18px;overflow:hidden;background:#fff;position:relative}
+.card .thumb svg{width:100%;height:100%;display:block}
+.card .name{font-size:21px}
+.card .done{position:absolute;top:6px;right:6px;width:30px;height:30px}
+
+/* ---------- Paint ---------- */
+#paint{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"top" "stage" "pal";gap:10px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));padding-block:10px 12px}
+.top{grid-area:top;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tbtn{display:flex;align-items:center;gap:6px;background:var(--card);border-radius:999px;padding:10px 16px;font-size:19px;box-shadow:0 3px 0 var(--soft);min-height:52px}
+.tbtn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--soft)}
+.tbtn svg{width:26px;height:26px}
+.tbtn[disabled]{opacity:.35}
+.ptitle{flex:1;text-align:center;font-size:26px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.confirm{display:flex;align-items:center;gap:8px;background:#fff3c4;border-radius:999px;padding:6px 8px 6px 16px;font-size:18px}
+.confirm button{border-radius:999px;padding:8px 14px;font-size:18px;background:var(--card)}
+.confirm .yes{background:var(--pink);color:#fff}
+.stage{grid-area:stage;min-height:0;display:flex;align-items:center;justify-content:center}
+.board{position:relative;background:#fff;border-radius:28px;box-shadow:0 6px 0 var(--soft);overflow:hidden;touch-action:none;max-width:100%}
+.board svg{width:100%;height:100%;display:block}
+.palette{grid-area:pal;display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:8px;justify-items:center;background:var(--card);border-radius:26px;padding:10px;box-shadow:0 4px 0 var(--soft)}
+.sw{width:52px;height:52px;border-radius:50%;position:relative;transition:transform .15s}
+.sw svg{width:100%;height:100%;display:block}
+.sw.on{transform:scale(1.15)}
+.sw.on::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:4px solid var(--ink)}
+.sw .lbl{position:absolute;inset:auto 0 -2px;font-size:11px;text-align:center}
+@media (orientation:landscape) and (min-width:700px){
+  #paint{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"top top" "stage pal"}
+  .palette{grid-template-columns:repeat(3,58px);align-content:center;overflow-y:auto;padding:14px}
+  .sw{width:56px;height:56px}
+}
+
+/* art */
+.art .r{fill:#fff;stroke:var(--line);stroke-width:2.6;stroke-linejoin:round;cursor:pointer}
+.art .bg{stroke:none}
+.art .d{stroke:var(--line);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.art .dk{fill:var(--line);stroke:none}
+.art .hl{fill:#fff;stroke:none}
+
+/* sparkles */
+.spark{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;pointer-events:none;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);animation:fly .6s ease-out forwards}
+@keyframes fly{from{transform:translate(0,0) scale(1);opacity:1}to{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+
+/* celebration */
+.party{position:fixed;inset:0;background:rgba(59,47,74,.35);display:grid;place-items:center;z-index:20;padding:20px}
+.party .box{background:var(--card);border-radius:32px;padding:28px 28px 22px;text-align:center;max-width:420px;width:100%;animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+.party h2{margin:6px 0 4px;font-size:38px;font-weight:400;color:var(--pink)}
+.party p{margin:0 0 18px;font-size:20px}
+.party .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.party .row button{font-size:20px;border-radius:999px;padding:12px 20px;background:var(--soft)}
+.party .row .go{background:var(--pink);color:#fff}
+.party svg.stars{width:140px;height:90px}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+.party .stars path{animation:twinkle 1.2s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:center}
+.party .stars path:nth-child(2){animation-delay:.3s}.party .stars path:nth-child(3){animation-delay:.6s}
+@keyframes twinkle{from{transform:scale(.8) rotate(-10deg)}to{transform:scale(1.1) rotate(10deg)}}
+@media (prefers-reduced-motion:reduce){.spark,.party .box,.party .stars path{animation:none}.card,.sw{transition:none}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-rainbow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff5a6e"/><stop offset=".2" stop-color="#ff9a3c"/><stop offset=".4" stop-color="#ffe14d"/>
+      <stop offset=".6" stop-color="#5fd38a"/><stop offset=".8" stop-color="#5aa8f5"/><stop offset="1" stop-color="#a07af0"/>
+    </linearGradient>
+    <pattern id="p-gold" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="#ffcf3f"/><circle cx="3" cy="4" r="1.6" fill="#fff6c8"/><circle cx="12" cy="13" r="1.2" fill="#fff"/>
+      <path d="M11 1 l1.2 2.6 l2.6 1.2 l-2.6 1.2 l-1.2 2.6 l-1.2 -2.6 l-2.6 -1.2 l2.6 -1.2z" fill="#fff"/>
+    </pattern>
+    <pattern id="p-dots" width="14" height="14" patternUnits="userSpaceOnUse">
+      <rect width="14" height="14" fill="#ffadd4"/><circle cx="3.5" cy="3.5" r="2.4" fill="#fff"/><circle cx="10.5" cy="10.5" r="2.4" fill="#fff"/>
+    </pattern>
+    <pattern id="p-stripe" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="10" height="10" fill="#7fdccd"/><rect width="4" height="10" fill="#e9fffb"/>
+    </pattern>
+    <pattern id="p-heart" width="18" height="18" patternUnits="userSpaceOnUse">
+      <rect width="18" height="18" fill="#d5c0ff"/>
+      <path d="M9 13 C3 9 5 4 9 7 C13 4 15 9 9 13Z" fill="#ff6fb1"/>
+    </pattern>
+  </defs>
+</svg>
+
+<div id="app">
+  <section id="home">
+    <header class="hero">
+      <svg class="logo" viewBox="0 0 72 72" aria-hidden="true">
+        <circle cx="36" cy="36" r="34" fill="#fff"/>
+        <circle cx="24" cy="26" r="9" fill="#ff5fa2"/><circle cx="46" cy="24" r="8" fill="#ffd23f"/>
+        <circle cx="50" cy="44" r="9" fill="#7cc6ff"/><circle cx="26" cy="48" r="8" fill="#8fdc6e"/>
+        <circle cx="36" cy="36" r="6" fill="#a07af0"/>
+      </svg>
+      <div>
+        <h1><span class="a">알록</span><span class="b">달록</span> <span class="c">색칠</span><span class="d">놀이</span></h1>
+        <p>그림을 고르고, 색을 고르고, 톡! 눌러 보세요</p>
+      </div>
+    </header>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section id="paint" hidden>
+    <div class="top" id="top">
+      <button class="tbtn" id="back" aria-label="그림 고르기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>그림 고르기
+      </button>
+      <div class="ptitle" id="ptitle"></div>
+      <button class="tbtn" id="undo" aria-label="되돌리기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>되돌리기
+      </button>
+      <button class="tbtn" id="reset" aria-label="처음부터">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>처음부터
+      </button>
+      <button class="tbtn" id="sound" aria-label="소리">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path id="wave" d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>
+      </button>
+      <div class="confirm" id="confirm" hidden>모두 지울까요?
+        <button class="yes" id="yes">지우기</button><button id="no">아니요</button>
+      </div>
+    </div>
+    <div class="stage" id="stage"><div class="board" id="board"></div></div>
+    <div class="palette" id="palette"></div>
+  </section>
+</div>
+
+<div class="party" id="party" hidden>
+  <div class="box">
+    <svg class="stars" viewBox="0 0 140 90" aria-hidden="true">
+      <path d="M30 20 l6 13 14 2 -10 10 2 14 -12 -7 -12 7 2 -14 -10 -10 14 -2z" fill="#ffd23f" stroke="#3b2f4a" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M70 4 l8 17 18 3 -13 13 3 18 -16 -9 -16 9 3 -18 -13 -13 18 -3z" fill="#ff5fa2" stroke="#3b2f4a" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M110 20 l6 13 14 2 -10 10 2 14 -12 -7 -12 7 2 -14 -10 -10 14 -2z" fill="#7cc6ff" stroke="#3b2f4a" stroke-width="2.5" stroke-linejoin="round"/>
+    </svg>
+    <h2>와, 다 칠했어요!</h2>
+    <p id="partyMsg">정말 예쁜 그림이 됐어요</p>
+    <div class="row">
+      <button id="stay">더 칠할래요</button>
+      <button class="go" id="next">다른 그림 칠하기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- drawing helpers (200 x 200 board) ---------- */
+const C=(x,y,r)=>`<circle class="r" cx="${x}" cy="${y}" r="${r}"/>`;
+const E=(x,y,rx,ry,rot=0)=>`<ellipse class="r" cx="${x}" cy="${y}" rx="${rx}" ry="${ry}"${rot?` transform="rotate(${rot} ${x} ${y})"`:''}/>`;
+const R=(x,y,w,h,rx=0)=>`<rect class="r" x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}"/>`;
+const P=d=>`<path class="r" d="${d}"/>`;
+const L=d=>`<path class="d" fill="none" d="${d}"/>`;
+const DOT=(x,y,r=2.5)=>`<circle class="d dk" cx="${x}" cy="${y}" r="${r}"/>`;
+const eye=(x,y,s=4.5)=>`<circle class="d dk" cx="${x}" cy="${y}" r="${s}"/><circle class="d hl" cx="${x+s*.35}" cy="${y-s*.4}" r="${s*.35}"/>`;
+const eyes=(x1,x2,y,s)=>eye(x1,y,s)+eye(x2,y,s);
+const smile=(x,y,w=7)=>L(`M${x-w} ${y} Q${x} ${y+w} ${x+w} ${y}`);
+const cheeks=(x1,x2,y,rx=8,ry=5)=>E(x1,y,rx,ry)+E(x2,y,rx,ry);
+const BG=`<rect class="r bg" x="0" y="0" width="200" height="200"/>`;
+const star=(x,y,Ro,ri=Ro*.48)=>{const p=[];for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?ri:Ro;p.push((x+rr*Math.cos(a)).toFixed(1)+' '+(y+rr*Math.sin(a)).toFixed(1));}return P('M'+p.join(' L')+' Z');};
+const heart=(x,y,s)=>P(`M${x} ${y+.8*s} C${x-1.4*s} ${y-.2*s} ${x-.6*s} ${y-1.1*s} ${x} ${y-.4*s} C${x+.6*s} ${y-1.1*s} ${x+1.4*s} ${y-.2*s} ${x} ${y+.8*s} Z`);
+const cloud=(x,y)=>P(`M${x-30} ${y+12} a12 12 0 0 1 4 -22 a16 16 0 0 1 28 -6 a14 14 0 0 1 24 10 a10 10 0 0 1 -2 18 Z`);
+const band=(Ro,ri,cy=150)=>P(`M${100-Ro} ${cy} A${Ro} ${Ro} 0 0 1 ${100+Ro} ${cy} L${100+ri} ${cy} A${ri} ${ri} 0 0 0 ${100-ri} ${cy} Z`);
+const petals=(cx,cy,d,r,n=6)=>{let s='';for(let i=0;i<n;i++){const a=i*2*Math.PI/n-Math.PI/2;s+=C((cx+d*Math.cos(a)).toFixed(1),(cy+d*Math.sin(a)).toFixed(1),r);}return s;};
+
+/* ---------- 24 original pictures ---------- */
+const DESIGNS=[
+{id:'unicorn',name:'유니콘',svg:BG+star(30,30,13)+star(172,34,10)+star(176,168,9)+
+  C(58,82,18)+C(48,112,17)+C(54,144,16)+C(142,82,18)+C(152,112,17)+C(146,144,16)+
+  P('M62 84 L66 42 L90 66 Z')+P('M138 84 L134 42 L110 66 Z')+
+  P('M86 70 L100 14 L114 70 Z')+L('M90 56 L110 51')+L('M93 43 L107 39')+L('M96 30 L104 28')+
+  E(100,118,55,52)+E(100,150,36,24)+P('M82 74 Q90 56 100 70 Q110 56 118 74 Q100 86 82 74 Z')+
+  cheeks(66,134,132,9,6)+eyes(80,120,112,5.5)+DOT(90,150)+DOT(110,150)+smile(100,160,8)},
+{id:'princess',name:'공주님',svg:BG+heart(30,172,13)+heart(172,166,11)+star(28,34,10)+
+  P('M62 160 Q100 174 138 160 L164 200 L36 200 Z')+
+  P('M48 165 Q36 60 100 52 Q164 60 152 165 Q130 150 100 150 Q70 150 48 165 Z')+
+  C(100,108,40)+P('M60 100 Q66 66 100 66 Q134 66 140 100 Q124 84 108 90 Q100 78 92 90 Q76 84 60 100 Z')+
+  P('M72 68 L74 34 L88 52 L100 28 L112 52 L126 34 L128 68 Z')+C(100,57,5)+C(84,61,3.5)+C(116,61,3.5)+
+  cheeks(78,122,122,8,5)+eyes(86,114,108,4.5)+smile(100,126,7)},
+{id:'cat',name:'아기 고양이',svg:BG+P('M138 170 Q188 160 178 108 Q174 96 164 104 Q172 140 132 152 Z')+
+  E(100,165,46,32)+E(100,172,20,15)+E(80,190,14,8)+E(120,190,14,8)+
+  P('M60 80 L58 32 L92 58 Z')+P('M140 80 L142 32 L108 58 Z')+P('M64 68 L64 42 L82 58 Z')+P('M136 68 L136 42 L118 58 Z')+
+  C(100,100,46)+cheeks(72,128,120,7,4.5)+eyes(82,118,96,5)+P('M94 108 L106 108 L100 115 Z')+
+  L('M100 115 Q94 122 88 118')+L('M100 115 Q106 122 112 118')+
+  L('M58 106 L78 110')+L('M57 116 L78 116')+L('M142 106 L122 110')+L('M143 116 L122 116')},
+{id:'bunny',name:'토끼',svg:BG+C(26,30,8)+C(176,24,6)+
+  E(78,55,15,40)+E(122,55,15,40)+E(78,60,7,28)+E(122,60,7,28)+
+  E(100,180,42,28)+E(100,125,52,44)+cheeks(70,130,140,8,5)+eyes(82,118,120,5)+E(100,134,6,4)+
+  L('M100 138 Q94 146 88 142')+L('M100 138 Q106 146 112 142')+
+  P('M160 152 Q154 132 166 140 Q168 128 174 142 Q184 134 178 152 Z')+P('M148 152 L188 152 L168 198 Z')+
+  L('M158 164 L166 164')+L('M168 176 L176 176')+L('M162 186 L169 186')},
+{id:'puppy',name:'강아지',svg:BG+C(28,170,9)+C(172,30,8)+
+  E(100,182,44,30)+C(100,105,48)+E(124,86,15,12)+
+  E(56,108,17,36,-18)+E(144,108,17,36,18)+
+  P('M66 146 Q100 164 134 146 L132 157 Q100 176 68 157 Z')+C(100,168,6)+
+  E(100,126,26,18)+E(100,117,9,6)+P('M94 134 Q100 150 106 134 Z')+
+  eyes(80,120,100,5)+L('M100 123 L100 130')+L('M88 130 Q100 140 112 130')},
+{id:'butterfly',name:'나비',svg:BG+C(30,175,7)+C(175,178,6)+
+  E(72,142,28,24,20)+E(128,142,28,24,-20)+E(62,82,40,34,-20)+E(138,82,40,34,20)+
+  C(55,76,12)+C(145,76,12)+C(70,142,9)+C(130,142,9)+C(82,100,6)+C(118,100,6)+
+  E(100,112,9,50)+C(100,58,13)+L('M95 48 Q85 26 75 22')+L('M105 48 Q115 26 125 22')+C(75,22,5)+C(125,22,5)+
+  DOT(95,56,2.2)+DOT(105,56,2.2)},
+{id:'flower',name:'웃는 꽃',svg:BG+C(170,32,16)+cloud(40,38)+
+  R(96,90,8,70)+P('M100 142 Q70 120 58 136 Q75 152 100 142 Z')+P('M100 126 Q130 104 142 120 Q126 136 100 126 Z')+
+  petals(100,70,30,20)+C(100,70,19)+eyes(93,107,67,3)+smile(100,75,5)+
+  P('M62 158 L138 158 L128 198 L72 198 Z')+R(56,148,88,14,5)},
+{id:'rainbow',name:'무지개',svg:BG+C(170,36,16)+star(30,34,9)+
+  band(86,72)+band(72,58)+band(58,44)+band(44,30)+
+  P('M0 166 Q100 146 200 166 L200 200 L0 200 Z')+cloud(32,146)+cloud(170,146)+heart(70,182,7)+heart(132,184,6)},
+{id:'cake',name:'생일 케이크',svg:BG+star(28,30,9)+star(172,28,8)+
+  E(100,186,82,10)+R(35,130,130,52,8)+
+  P('M35 142 Q35 130 47 130 L153 130 Q165 130 165 142 Q158 152 150 142 Q140 154 125 142 Q112 154 100 142 Q88 154 75 142 Q62 154 50 142 Q42 152 35 142 Z')+
+  R(55,90,90,42,8)+P('M55 100 Q55 88 67 88 L133 88 Q145 88 145 100 Q138 110 130 100 Q120 112 110 100 Q100 112 90 100 Q80 112 70 100 Q62 110 55 100 Z')+
+  R(70,58,10,32,3)+R(95,52,10,38,3)+R(120,58,10,32,3)+
+  P('M75 56 Q66 44 75 34 Q84 44 75 56 Z')+P('M100 50 Q91 38 100 28 Q109 38 100 50 Z')+P('M125 56 Q116 44 125 34 Q134 44 125 56 Z')+
+  C(60,164,6)+C(100,164,6)+C(140,164,6)},
+{id:'icecream',name:'아이스크림',svg:BG+heart(32,168,10)+star(170,170,10)+
+  P('M64 104 L136 104 L100 196 Z')+L('M80 104 L117 150')+L('M100 104 L125 130')+L('M120 104 L83 150')+L('M100 104 L75 130')+
+  C(100,88,32)+C(100,48,26)+L('M88 38 L92 34')+L('M108 32 L113 35')+L('M96 58 L100 55')+L('M114 52 L118 56')+
+  C(100,18,8)+L('M100 10 Q104 0 113 3')+
+  cheeks(84,116,98,6,4)+eyes(88,112,88,4)+smile(100,96,6)},
+{id:'house',name:'우리 집',svg:BG+C(166,34,17)+cloud(46,34)+
+  P('M0 172 Q50 158 100 172 Q150 184 200 168 L200 200 L0 200 Z')+
+  R(128,48,16,32,2)+P('M28 102 L100 40 L172 102 Z')+R(45,100,110,78,2)+
+  P('M88 178 L88 140 Q100 126 112 140 L112 178 Z')+DOT(106,158,2.5)+
+  R(56,114,24,22,3)+R(120,114,24,22,3)+L('M68 114 L68 136 M56 125 L80 125')+L('M132 114 L132 136 M120 125 L144 125')+
+  C(24,184,6)+C(176,184,6)+C(40,190,5)},
+{id:'castle',name:'성',svg:BG+cloud(100,30)+star(170,22,8)+
+  R(0,180,200,20)+R(28,72,34,108,2)+R(138,72,34,108,2)+
+  L('M45 30 L45 8')+P('M45 8 L62 14 L45 20 Z')+L('M155 30 L155 8')+P('M155 8 L172 14 L155 20 Z')+
+  P('M22 74 L45 28 L68 74 Z')+P('M132 74 L155 28 L178 74 Z')+
+  R(58,88,14,14,1)+R(93,88,14,14,1)+R(128,88,14,14,1)+R(58,100,84,80,2)+
+  P('M84 180 L84 150 Q100 132 116 150 L116 180 Z')+R(38,96,14,18,6)+R(148,96,14,18,6)+heart(100,122,10)},
+{id:'fish',name:'물고기',svg:BG+P('M18 200 Q8 170 24 148 Q36 172 30 200 Z')+P('M178 200 Q170 176 184 160 Q194 180 190 200 Z')+
+  C(40,40,8)+C(56,24,5)+C(30,62,4)+
+  P('M75 64 Q100 28 128 66 Z')+P('M84 136 Q96 162 112 136 Z')+P('M140 100 L190 64 L180 100 L190 136 Z')+
+  E(95,100,60,42)+C(112,82,8)+C(128,108,7)+C(104,118,6)+L('M66 74 Q80 100 66 126')+
+  cheeks(58,58,114,6,4)+eye(54,92,6)+L('M38 108 Q44 114 50 108')},
+{id:'owl',name:'부엉이',svg:BG+C(166,32,16)+star(30,30,9)+
+  R(8,170,184,14,7)+P('M52 72 L48 38 L78 56 Z')+P('M148 72 L152 38 L122 56 Z')+
+  E(100,110,55,62)+E(100,132,34,38)+
+  P('M47 96 Q26 140 60 162 Q56 126 47 96 Z')+P('M153 96 Q174 140 140 162 Q144 126 153 96 Z')+
+  C(78,88,20)+C(122,88,20)+eye(78,90,9)+eye(122,90,9)+P('M92 108 L108 108 L100 122 Z')+
+  L('M88 132 L94 138 L100 132 L106 138 L112 132')+L('M90 150 L96 156 L102 150 L108 156')+
+  E(84,172,9,6)+E(116,172,9,6)},
+{id:'bear',name:'곰돌이',svg:BG+heart(28,32,10)+heart(172,30,9)+
+  C(58,58,20)+C(142,58,20)+C(58,58,10)+C(142,58,10)+
+  E(54,160,14,22,30)+E(146,160,14,22,-30)+E(100,166,48,40)+E(100,172,26,22)+E(70,196,16,10)+E(130,196,16,10)+
+  C(100,95,46)+E(100,113,22,16)+E(100,104,8,5)+cheeks(70,130,108,7,5)+eyes(82,118,88,5)+
+  L('M100 109 L100 116')+L('M92 118 Q100 124 108 118')+
+  P('M100 140 L80 130 L80 150 Z')+P('M100 140 L120 130 L120 150 Z')+C(100,140,5)},
+{id:'dino',name:'아기 공룡',svg:BG+C(30,30,14)+cloud(150,32)+
+  R(0,180,200,20)+P('M60 150 Q20 162 14 134 Q36 146 66 128 Z')+
+  P('M52 114 L55 92 L68 104 Z')+P('M70 102 L78 80 L90 98 Z')+P('M94 96 L104 76 L112 96 Z')+P('M124 64 L134 46 L142 62 Z')+
+  R(62,158,18,30,6)+R(100,158,18,30,6)+E(90,136,48,40)+E(96,148,26,22)+C(66,124,6)+C(76,152,5)+
+  E(140,88,36,28)+cheeks(158,158,96,6,4)+eye(150,80,5)+DOT(170,80,2)+L('M146 98 Q158 104 170 96')},
+{id:'rocket',name:'로켓',svg:BG+C(42,148,24)+L('M10 160 Q42 136 76 140')+C(34,142,5)+C(50,158,4)+
+  star(30,40,10)+star(170,176,8)+star(178,40,7)+
+  `<g transform="translate(18 0)">`+P('M85 160 Q100 202 115 160 Z')+P('M92 160 Q100 186 108 160 Z')+
+  P('M75 118 L55 166 L80 156 Z')+P('M125 118 L145 166 L120 156 Z')+
+  P('M75 160 L75 80 Q75 42 100 18 Q125 42 125 80 L125 160 Z')+P('M82 52 Q90 32 100 18 Q110 32 118 52 Z')+
+  R(75,130,50,10)+C(100,90,16)+C(100,90,10)+`</g>`},
+{id:'car',name:'자동차',svg:BG+cloud(150,40)+C(36,34,14)+
+  R(0,168,200,32)+R(14,184,26,6,3)+R(86,184,26,6,3)+R(158,184,26,6,3)+
+  P('M18 152 L18 122 Q18 110 32 108 L55 105 L75 76 Q80 68 90 68 L135 68 Q145 68 150 76 L166 105 L176 108 Q186 112 186 126 L186 152 Z')+
+  P('M82 103 L92 80 L108 80 L108 103 Z')+P('M118 103 L118 80 L138 80 L150 103 Z')+L('M113 108 L113 146')+
+  E(178,122,6,7)+R(18,116,7,12,2)+C(56,154,20)+C(148,154,20)+C(56,154,8)+C(148,154,8)},
+{id:'snowman',name:'눈사람',svg:BG+star(28,30,8)+star(168,24,7)+star(176,96,6)+star(22,104,6)+
+  P('M0 176 Q100 160 200 176 L200 200 L0 200 Z')+L('M72 106 L44 88 M52 93 L46 80')+L('M128 106 L156 88 M148 93 L154 80')+
+  C(100,160,40)+C(100,108,30)+C(100,64,24)+C(100,106,4)+C(100,120,4)+C(100,148,5)+C(100,166,5)+
+  P('M74 84 Q100 98 126 84 L126 94 Q100 108 74 94 Z')+R(108,90,12,30,4)+
+  R(80,12,40,30,3)+R(80,32,40,8)+R(68,40,64,8,3)+
+  P('M100 66 L122 70 L100 72 Z')+eyes(92,108,58,3.5)+DOT(92,76,1.8)+DOT(100,78,1.8)+DOT(108,76,1.8)},
+{id:'heart',name:'하트 친구',svg:BG+heart(32,40,12)+heart(168,44,14)+heart(36,168,10)+heart(166,168,12)+star(100,18,8)+
+  E(40,94,24,15,-20)+E(160,94,24,15,20)+heart(100,108,62)+
+  cheeks(76,124,116,8,5)+eyes(86,114,100,5)+smile(100,114,8)},
+{id:'strawberry',name:'딸기',svg:BG+petals(34,34,9,6,5)+C(34,34,6)+petals(168,168,9,6,5)+C(168,168,6)+
+  R(96,28,8,24,3)+P('M100 184 Q40 160 45 96 Q50 66 100 72 Q150 66 155 96 Q160 160 100 184 Z')+
+  P('M70 78 L80 55 L92 68 L100 48 L108 68 L120 55 L130 78 Q100 90 70 78 Z')+
+  L('M64 104 L66 108')+L('M136 104 L134 108')+L('M70 150 L72 154')+L('M130 150 L128 154')+L('M100 160 L100 164')+L('M60 128 L62 132')+L('M140 128 L138 132')+
+  cheeks(78,122,128,8,5)+eyes(86,114,114,5)+smile(100,128,8)},
+{id:'penguin',name:'펭귄',svg:BG+star(30,30,8)+star(172,40,9)+
+  P('M0 180 L200 180 L200 200 L0 200 Z')+
+  P('M50 104 Q24 140 46 162 Q56 134 54 110 Z')+P('M150 104 Q176 140 154 162 Q144 134 146 110 Z')+
+  E(100,112,52,70)+E(100,128,36,52)+E(82,182,14,7)+E(118,182,14,7)+
+  P('M90 94 L110 94 L100 106 Z')+cheeks(76,124,100,7,4)+eyes(86,114,84,4.5)+
+  P('M56 62 Q100 2 144 62 Z')+R(54,56,92,12,6)+C(100,30,9)},
+{id:'octopus',name:'문어',svg:BG+C(30,40,7)+C(44,24,4)+C(170,34,6)+P('M176 200 Q168 176 182 160 Q192 180 188 200 Z')+
+  E(44,158,13,32,-22)+E(72,162,13,32,-11)+E(100,164,13,32)+E(128,162,13,32,11)+E(156,158,13,32,22)+
+  E(100,95,55,50)+C(76,66,7)+C(126,62,6)+C(138,84,4)+
+  cheeks(74,126,110,8,5)+eyes(84,116,98,5.5)+smile(100,110,7)},
+{id:'star',name:'별 친구',svg:BG+C(166,34,18)+C(160,30,4)+C(172,40,3)+star(28,30,10)+star(28,176,9)+star(174,172,11)+
+  star(100,112,84,40)+cheeks(80,120,124,6,4)+eyes(88,112,108,4.5)+smile(100,120,7)}
+];
+
+/* ---------- palette ---------- */
+const COLORS=[
+ ['#ff5a6e','빨강'],['#ff8a4c','주황'],['#ffc83d','노랑'],['#fff07a','연노랑'],['#a8e05f','연두'],['#3fbf7f','초록'],
+ ['#6fdccf','민트'],['#62c6f5','하늘'],['#4a7ff0','파랑'],['#9b6cf0','보라'],['#cdb0ff','연보라'],['#ff9fcf','분홍'],
+ ['#ff4fa3','진분홍'],['#ffd0b0','살구'],['#a8704a','갈색'],['#bfc3d6','회색'],['#4a4060','검정'],
+ ['url(#g-rainbow)','무지개'],['url(#p-gold)','반짝이'],['url(#p-dots)','물방울'],['url(#p-stripe)','줄무늬'],['url(#p-heart)','하트'],
+ ['erase','지우개']
+];
+
+/* ---------- state ---------- */
+const KEY='alrok-coloring-v1';
+let store={};try{store=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){store={};}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){}};
+let soundOn=true;try{soundOn=localStorage.getItem(KEY+'-snd')!=='off';}catch(e){}
+let cur='#ff5a6e', design=null, regions=[], fills=[], undo=[];
+
+const $=id=>document.getElementById(id);
+const svgOf=d=>`<svg class="art" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${d.svg}</svg>`;
+const paintAll=(svg,f)=>svg.querySelectorAll('.r').forEach((el,i)=>{el.style.fill=f[i]||'#fff';});
+const isDone=(d,f)=>{const n=(d.svg.match(/class="r/g)||[]).length;for(let i=0;i<n;i++)if(!f[i])return false;return true;};
+
+/* ---------- home ---------- */
+function renderHome(){
+  const g=$('grid');g.innerHTML='';
+  DESIGNS.forEach(d=>{
+    const b=document.createElement('button');b.className='card';b.setAttribute('aria-label',d.name+' 색칠하기');
+    const f=store[d.id]||[];
+    b.innerHTML=`<div class="thumb">${svgOf(d)}${isDone(d,f)?'<svg class="done" viewBox="0 0 30 30"><path d="M15 2 l3.8 8 8.7 1.2 -6.3 6 1.6 8.6 -7.8 -4.2 -7.8 4.2 1.6 -8.6 -6.3 -6 8.7 -1.2z" fill="#ffd23f" stroke="#3b2f4a" stroke-width="2" stroke-linejoin="round"/></svg>':''}</div><span class="name">${d.name}</span>`;
+    paintAll(b.querySelector('svg.art'),f);
+    b.onclick=()=>{blip(520);openDesign(d);};
+    g.appendChild(b);
+  });
+}
+
+/* ---------- paint ---------- */
+function renderPalette(){
+  const p=$('palette');p.innerHTML='';
+  COLORS.forEach(([c,n])=>{
+    const b=document.createElement('button');b.className='sw'+(c===cur?' on':'');b.setAttribute('aria-label',n);b.title=n;
+    b.innerHTML=c==='erase'
+      ?`<svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24" fill="#fff" stroke="#3b2f4a" stroke-width="2.5"/><rect x="14" y="20" width="24" height="13" rx="3" fill="#ffb3c9" stroke="#3b2f4a" stroke-width="2.5" transform="rotate(-30 26 26)"/><path d="M20 30 l8 -5" stroke="#3b2f4a" stroke-width="2.5" transform="rotate(0)"/></svg>`
+      :`<svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24" style="fill:${c}" stroke="#3b2f4a" stroke-width="2.5"/><ellipse cx="18" cy="17" rx="6" ry="4" fill="#fff" opacity=".45"/></svg>`;
+    b.onclick=()=>{cur=c;blip(700);p.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));b.classList.add('on');};
+    p.appendChild(b);
+  });
+}
+function openDesign(d){
+  design=d;fills=(store[d.id]||[]).slice();undo=[];
+  $('ptitle').textContent=d.name;
+  $('board').innerHTML=svgOf(d);
+  const svg=$('board').querySelector('svg');regions=[...svg.querySelectorAll('.r')];
+  paintAll(svg,fills);
+  $('home').hidden=true;$('paint').hidden=false;hideConfirm();updUndo();fit();
+}
+function fit(){
+  if($('paint').hidden)return;
+  const r=$('stage').getBoundingClientRect();const s=Math.max(120,Math.floor(Math.min(r.width,r.height)));
+  const b=$('board');b.style.width=s+'px';b.style.height=s+'px';
+}
+addEventListener('resize',fit);
+const updUndo=()=>{$('undo').disabled=!undo.length;};
+
+$('board').addEventListener('pointerdown',e=>{
+  const el=e.target.closest&&e.target.closest('.r');if(!el)return;
+  e.preventDefault();
+  const i=regions.indexOf(el);if(i<0)return;
+  const next=cur==='erase'?null:cur, prev=fills[i]||null;
+  if(prev===next){return;}
+  const wasDone=isDone(design,fills);
+  undo.push([i,prev]);fills[i]=next;el.style.fill=next||'#fff';
+  store[design.id]=fills.slice();save();updUndo();
+  sparkle(e);blip(next?600+Math.random()*300:380);
+  if(!wasDone&&isDone(design,fills))setTimeout(celebrate,450);
+});
+$('undo').onclick=()=>{const u=undo.pop();if(!u)return;const[i,prev]=u;fills[i]=prev;regions[i].style.fill=prev||'#fff';store[design.id]=fills.slice();save();updUndo();blip(420);};
+$('back').onclick=()=>{blip(480);$('paint').hidden=true;$('home').hidden=false;renderHome();};
+$('reset').onclick=()=>{$('confirm').hidden=false;['undo','reset','sound'].forEach(id=>$(id).hidden=true);};
+function hideConfirm(){$('confirm').hidden=true;['undo','reset','sound'].forEach(id=>$(id).hidden=false);}
+$('no').onclick=hideConfirm;
+$('yes').onclick=()=>{fills=[];undo=[];regions.forEach(r=>r.style.fill='#fff');store[design.id]=[];save();updUndo();hideConfirm();blip(300);};
+
+/* sparkles */
+const SPARK=['#ffd23f','#ff5fa2','#7cc6ff','#8fdc6e','#a07af0'];
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function sparkle(e){
+  if(reduce)return;const b=$('board'),r=b.getBoundingClientRect();
+  for(let k=0;k<7;k++){
+    const s=document.createElement('div');s.className='spark';
+    const a=Math.random()*Math.PI*2,d=30+Math.random()*40;
+    s.style.left=(e.clientX-r.left)+'px';s.style.top=(e.clientY-r.top)+'px';
+    s.style.background=SPARK[k%SPARK.length];
+    s.style.setProperty('--dx',Math.cos(a)*d+'px');s.style.setProperty('--dy',Math.sin(a)*d+'px');
+    b.appendChild(s);setTimeout(()=>s.remove(),650);
+  }
+}
+
+/* celebration */
+function celebrate(){
+  $('partyMsg').textContent=design.name+' 그림이 정말 예뻐졌어요';
+  $('party').hidden=false;[0,150,300,450].forEach((t,i)=>setTimeout(()=>blip(600+i*150),t));
+}
+$('stay').onclick=()=>{$('party').hidden=true;};
+$('next').onclick=()=>{$('party').hidden=true;$('paint').hidden=true;$('home').hidden=false;renderHome();};
+
+/* sound */
+let ac=null;
+function blip(f){
+  if(!soundOn)return;
+  try{
+    ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+    if(ac.state==='suspended')ac.resume();
+    const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime;
+    o.type='sine';o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(f*1.6,t+.09);
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.18,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+.16);
+    o.connect(g).connect(ac.destination);o.start(t);o.stop(t+.18);
+  }catch(e){}
+}
+function updSound(){$('wave').style.opacity=soundOn?1:0;$('sound').setAttribute('aria-label',soundOn?'소리 끄기':'소리 켜기');}
+$('sound').onclick=()=>{soundOn=!soundOn;try{localStorage.setItem(KEY+'-snd',soundOn?'on':'off');}catch(e){}updSound();blip(660);};
+
+/* start: if nothing colored yet, show a sample on the first picture so the gallery isn't blank */
+if(!Object.keys(store).length){
+  store.unicorn=['#fff6fb','url(#p-gold)','#ffd23f','#ffc83d','#ff9fcf','#cdb0ff','#62c6f5','#ff9fcf','#cdb0ff','#62c6f5',null,null,'url(#g-rainbow)',null,'#ffe3f0','#ff9fcf','#ff9fcf','#ff9fcf'];
+}
+renderHome();renderPalette();updSound();
+</script>
